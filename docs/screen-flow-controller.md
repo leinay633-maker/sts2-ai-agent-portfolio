@@ -1,0 +1,202 @@
+# STS2 Screen Flow 执行流程
+
+本文件只定义界面流转动作，不定义构筑优先级。策略判断仍来自 `docs/ironclad-strategy-playbook.md`、`docs/ironclad-card-knowledge-base.md`、`docs/monster-encounter-knowledge-base.md` 和 `docs/run-review-learning-log.md` 的结构化经验。
+
+## 通用硬规则
+
+```yaml
+rules:
+  - id: screen_first_get
+    action: "任何界面第一步必须 GET 当前状态，禁止基于旧 screen/actionable 字段行动。"
+  - id: post_then_get
+    action: "任何 POST 后必须重新 GET；奖励、商店、选牌、事件、hand_select 都可能导致 index 左移或 screen 改变。"
+  - id: unstable_screen_wait
+    condition: "screen is null OR is_play_phase=false OR animation/overlay not settled OR action list conflicts with screen"
+    action: "Start-Sleep 1-2 秒后再 GET；最多重试 10 次，仍异常则输出 MCP_POLL_TIMEOUT。"
+  - id: no_watchdog_no_save_restore
+    action: "禁止运行 watchdog；禁止 AI 调用 STS2Saves 恢复/回档。Boss 前由 AI 自行定位最新自动存档并执行镜像备份，不提醒用户。"
+```
+
+## 战斗界面
+
+```yaml
+screen: combat
+entry_actions:
+  - "GET 当前战斗状态，确认 turn、is_play_phase、hand、draw/discard/exhaust、enemy entity_id、intent、hp/block/powers。"
+  - "若不是玩家可行动阶段，按 docs/agent-system-protocol.md 敌人回合轮询协议等待。"
+knowledge_lookup:
+  - "按 enemy entity_id/name 在 docs/monster-encounter-knowledge-base.md 查机制；Boss/精英优先查 Boss/精英 MCP 映射补充。"
+  - "按手牌关键牌在 docs/ironclad-card-knowledge-base.md 查执行索引。"
+decision_required:
+  - "出牌前说明关键目标、是否吃药、是否保留资源。"
+  - "end_turn 前必须完成 docs/agent-system-protocol.md turn_check。"
+allowed_actions:
+  - play_card
+  - use_potion
+  - combat_select_card
+  - combat_confirm_selection
+  - end_turn
+exit_after:
+  - "每次 play_card/use_potion/hand_select 后立即 GET。"
+  - "POST end_turn 后按 1 秒轮询，连续 2 次玩家阶段且手牌稳定才开始新回合。"
+```
+
+## 地图界面
+
+```yaml
+screen: map
+entry_actions:
+  - "GET 可选节点列表、当前血量、金币、药水、遗物、路线后续风险。"
+knowledge_lookup:
+  - "docs/ironclad-strategy-playbook.md 路线规则。"
+  - "docs/ascension-risk-model.md 用于评估 A5 风险。"
+decision_required:
+  - "说明选择节点的理由：回血/商店/火堆/精英/问号/普通战斗的风险收益。"
+boss_gate:
+  condition: "next selectable node is boss"
+  action: "暂停进入 Boss 的 POST；先定位最新 STS2Saves 自动存档，运行 `scripts/mirror_sts2saves.ps1` 做镜像备份并验证输出；不提醒用户，完成后再 choose_map_node。"
+allowed_actions:
+  - choose_map_node
+exit_after:
+  - "choose_map_node 后立即 GET；若进入战斗动画或 screen 未稳定，等待 1-2 秒再 GET。"
+```
+
+## 奖励界面
+
+```yaml
+screen: reward
+entry_actions:
+  - "GET rewards 列表、can_proceed、金币/药水/卡牌奖励、当前牌组和药水栏。"
+decision_required:
+  - "每次只处理一个 reward index。"
+  - "说明领取/跳过理由；卡牌奖励先查 docs/ironclad-card-knowledge-base.md 和 docs/ironclad-strategy-playbook.md 构筑短板。"
+index_rule:
+  - "claim_reward index=0 后奖励列表通常左移；必须重新 GET 后再处理下一项。"
+  - "选择卡牌奖励后可能 rewards 为空但 can_proceed=true；不要假设还有 Boss 遗物。"
+allowed_actions:
+  - claim_reward
+  - select_card_reward
+  - proceed
+exit_after:
+  - "每次领取、选牌或 proceed 后立即 GET。"
+```
+
+## 卡牌奖励/选牌界面
+
+```yaml
+screen: card_reward_or_card_select
+entry_actions:
+  - "GET card options、card_index/index 语义、当前牌组短板。"
+knowledge_lookup:
+  - "docs/ironclad-card-knowledge-base.md tier、语境、关键牌执行索引。"
+  - "docs/ironclad-strategy-playbook.md 构筑与选牌规则。"
+decision_required:
+  - "说明选牌、跳过或不选的理由。"
+allowed_actions:
+  - select_card_reward
+  - select_card
+  - confirm_selection
+exit_after:
+  - "动作后 GET；若进入奖励页或地图页，按对应流程继续。"
+```
+
+## 事件界面
+
+```yaml
+screen: event
+entry_actions:
+  - "GET event id/name/options、当前血量、金币、遗物、牌组、可承受损失。"
+decision_required:
+  - "说明每个高风险选项的成本：失血、删牌、变牌、拿诅咒、拿遗物、战斗。"
+  - "若选项会导致死亡或破坏核心构筑，禁止选择，除非是唯一通路且用户确认。"
+allowed_actions:
+  - choose_event_option
+  - proceed
+exit_after:
+  - "事件选项后 GET；若无 options 但可 proceed，proceed 后再 GET。"
+```
+
+## 商店界面
+
+```yaml
+screen: shop
+entry_actions:
+  - "GET 商品列表、价格、金币、当前牌组短板、药水栏、可删除牌。"
+knowledge_lookup:
+  - "docs/ironclad-strategy-playbook.md shop_priority。"
+  - "docs/ironclad-card-knowledge-base.md 评估核心牌和关键防御牌。"
+decision_required:
+  - "购买前说明为什么优先买该牌/遗物/药水/删牌。"
+  - "A5 Act2+ 防御不足时，防御牌和保命药水优先于锦上添花输出。"
+index_rule:
+  - "shop_purchase 后商品和金币可能变化；必须 GET 后再买下一项。"
+allowed_actions:
+  - shop_purchase
+  - proceed
+exit_after:
+  - "购买/离开后 GET。"
+```
+
+## 篝火界面
+
+```yaml
+screen: rest_site
+entry_actions:
+  - "GET 当前血量/最大血、可选休息项、可升级牌、下一节点风险。"
+decision_required:
+  - "在休息、升级、特殊选项之间说明风险收益。"
+  - "Boss/精英前低血且无稳定防御时，休息权重上升。"
+allowed_actions:
+  - choose_rest_option
+  - select_card
+  - confirm_selection
+exit_after:
+  - "选择休息项或升级确认后 GET；若回地图继续按地图流程。"
+```
+
+## 宝箱界面
+
+```yaml
+screen: treasure
+entry_actions:
+  - "GET 宝箱奖励、遗物 index、是否可 proceed。"
+allowed_actions:
+  - claim_treasure_relic
+  - proceed
+exit_after:
+  - "claim_treasure_relic index=0 后 GET；如果 can_proceed=true 则 proceed。"
+```
+
+## hand_select / combat_select 界面
+
+```yaml
+screen: hand_select
+entry_actions:
+  - "GET 选择原因、可选手牌、当前卡牌效果。"
+decision_required:
+  - "说明要消耗/选择/保留哪张牌，尤其 True Grit、Burning Pact、Headbutt、Liquid Memories 等。"
+allowed_actions:
+  - combat_select_card
+  - combat_confirm_selection
+exit_after:
+  - "选择后 GET；确认后再 GET。"
+```
+
+## 结算和异常覆盖层
+
+```yaml
+screen: overlay_or_gameover
+rules:
+  - id: gameover_screen_after_act3_boss
+    condition: "screen == NGameOverScreen AND previous context is act3 boss defeated"
+    action: "记为通关/终局结算，不把 hp=0 当作战斗内死亡。先写 manual-knowledge structured entry，再等待用户。"
+  - id: gameover_screen_after_death
+    condition: "screen == NGameOverScreen AND combat death/result determinable"
+    action: "写死亡 summary；若用户要重开，必须先确认本局 summary 已落盘。"
+  - id: architect_event_after_boss
+    condition: "screen is architect/event after act3 boss"
+    action: "若有 options，按事件流程；若 rewards empty and can_proceed=true，则 proceed 后 GET。"
+  - id: unknown_overlay
+    condition: "screen/action list cannot be classified"
+    action: "停止 POST，输出 screen、available_actions、关键状态字段，等待用户或后续 GET 稳定。"
+```

@@ -1,0 +1,170 @@
+# STS2 Ironclad Playbook
+
+本文件只放相对稳定的策略规则。当前难度、楼层、血量、牌组方向写在 `examples/current-run-state-snapshot.example.md` 或 MCP 状态里，不写在这里。
+
+## 1. 战斗规则
+
+```yaml
+rules:
+  - id: combat_do_not_trade_core_defense_for_short_damage
+    condition: "act >= 2 OR ascension >= 5"
+    actions:
+      - "不为短期伤害牺牲核心防御密度。"
+      - "若本回合后可能进入高压回合，优先保血、弱化、朝向修正或保留防御药水。"
+    source: [".agent.md 战斗原则", "manual-knowledge A5 第二幕 Boss 失败"]
+    confidence: high
+  - id: facing_and_surrounding_priority
+    condition: "combat has facing/surrounding/backstab mechanics"
+    actions:
+      - "优先面对当前最大攻击来源。"
+      - "每回合用有目标卡牌或药水修正朝向，并在 turn_check 里计算修正前后入伤。"
+    confidence: high
+  - id: self_damage_low_hp_gate
+    condition: "hp <= incoming_damage_next_turn.total + 10 OR hp <= 15"
+    actions:
+      - "Bloodletting、Offering、Hemokinesis、Blood Wall、Brand 按高风险处理。"
+      - "只有能形成斩杀、足额防御、关键启动或有无实体/回血保护时才可打。"
+    confidence: high
+  - id: battle_trance_ordering
+    condition: "hand contains Battle Trance/Battle Trance+ AND other draw/search cards are playable"
+    actions:
+      - "若当前牌组依赖 Dark Embrace/Feel No Pain/消耗链，Battle Trance 默认视为反协同牌，不主动打。"
+      - "原因：Battle Trance 会封锁本回合后续抽牌，直接切断 Dark Embrace、Shrug It Off、Pillage、Offering 等续抽。"
+      - "只有在没有后续抽牌需求，或唯一生路/确认斩杀必须立刻找牌时才可破例；破例必须在 turn_check 或行动说明中明确。"
+    confidence: high
+  - id: draw_order_scope_limit
+    condition: "planning around draw pile, Battle Trance, Pillage, Burning Pact, Headbutt, or snapshot retry"
+    actions:
+      - "不要把 MCP GET 展示的 draw_pile 列表当作真实抽牌顺序；该列表会被洗乱/不保证按实际抽牌顺序输出。"
+      - "普通战斗按抽牌顺序未知处理，只根据实际抽到的当前手牌决策。"
+      - "同一个 STS2Saves 快照反复读档时，即使有实测顺序，也只在该快照和同一战斗内谨慎使用，不能写成通用构筑规则。"
+      - "涉及抽牌、检索、头槌顶牌、弃牌堆选择后必须重新 GET，以当前手牌和牌堆状态为准。"
+    confidence: high
+  - id: rage_multi_attack_block
+    condition: "hand contains Rage/Rage+ AND this turn can play >= 3 attacks"
+    actions:
+      - "优先评估先打 Rage 再多攻击的格挡收益。"
+    confidence: high
+  - id: boss_and_elite_potion_spend
+    condition: "combat is boss or dangerous elite"
+    actions:
+      - "药水用于跨越危险回合、建立启动或斩杀窗口。"
+      - "Act3 Boss 前药水视为终局资源，不为战后保留。"
+    evidence_runs: [A1]
+    confidence: high
+```
+
+## 2. 路线规则
+
+```yaml
+rules:
+  - id: act1_elite_if_output_and_resource_ready
+    condition: "act == 1 AND deck has strong early output AND (good potion OR relic OR campfire support)"
+    actions:
+      - "可以主动吃精英。"
+      - "若只有防御没有输出，降低精英优先级。"
+    confidence: high
+  - id: map_route_commit_to_question_marks
+    condition: "screen is map AND no immediate low-hp emergency or forced boss path"
+    actions:
+      - "优先先看整条可达分支，再决定本幕/本层主路线，不要每到一个节点才临时选。"
+      - "默认优先选择问号数量更多的路线；若两条路线强度接近，优先问号更多的一边。"
+      - "只有在血量过低、急需篝火/商店、必须规避精英或问号会明显绕远关键补给时，才偏离问号最多路线。"
+    confidence: medium
+  - id: act2_defense_weight_increase
+    condition: "act >= 2"
+    actions:
+      - "提高防御、抽牌、状态处理和稳定性权重。"
+      - "低血、无药水、防御不足时优先商店、篝火、问号或低风险小怪路线。"
+    confidence: high
+  - id: boss_snapshot_reminder
+    condition: "next_node is boss OR current_floor is boss_preparation"
+    actions:
+      - "暂停进入 Boss 的 POST。"
+      - "AI 自行定位最新 STS2Saves 自动存档，运行镜像备份并验证备份结果。"
+      - "不提醒用户、不等待用户确认；备份成功后继续进入 Boss。"
+      - "普通节点、普通战斗、奖励页不处理存档。"
+    confidence: high
+```
+
+## 3. 构筑与选牌规则
+
+```yaml
+rules:
+  - id: perfect_strike_route_trigger
+    condition: "deck contains Perfected Strike AND count(cards whose English/Chinese name contains Strike/打击) >= 3"
+    actions:
+      priority_pick: ["Hellraiser", "Strike Dummy", "Pommel Strike", "Twin Strike", "Setup Strike", "Uppercut", "Burning Pact"]
+      do_not_remove: "Strike-named cards unless deck already has stronger engine and strike density is excessive"
+      remove_priority: ["curses", "wounds", "weak Defend", "excess basic Strike after act2 if no strong strike relic/synergy"]
+    evidence_runs: [A1, A2, A3, A4]
+    confidence: medium
+  - id: perfect_strike_not_only_win_condition
+    condition: "act >= 2 AND deck relies on Perfected Strike output"
+    actions:
+      - "把 Perfected Strike 当作输出外壳，不当作唯一终局路线。"
+      - "优先转向消耗 + 抽牌 + 能量 + 易伤爆发，并补高质量防御。"
+    confidence: high
+  - id: defense_before_deleting_defends
+    condition: "consider removing Defend or skipping defense reward"
+    actions:
+      - "只有已有更强防御替代时才持续删 Defend。"
+      - "替代包括 Shrug It Off+、True Grit+、Flame Barrier、Impervious、Feel No Pain、Unmovable、Rage+、防御药水、稳定弱化。"
+    confidence: high
+  - id: consume_engine_priority
+    condition: "deck is thick OR has exhaust payoffs OR bad statuses/curses"
+    actions:
+      priority_pick: ["Burning Pact", "Fiend Fire", "Dark Embrace", "Feel No Pain", "Second Wind", "True Grit", "Pact's End", "Offering", "Bloodletting"]
+      notes: "厚牌组要补抽牌和消耗处理，不为短期协同继续加入低质量攻击。"
+    confidence: high
+  - id: ghost_seed_conditional_thinning
+    condition: "relics contains Ghost Seed"
+    actions:
+      - "Strike/Defend 带虚无时可视为战斗中自然瘦身。"
+      - "仍需按 Perfected Strike/防御密度判断是否删除基础牌。"
+    confidence: medium
+  - id: red_skull_low_hp_context
+    condition: "relics contains Red Skull AND hp is below relic threshold"
+    actions:
+      - "低血力量可强化斩杀线，但不能作为常规防御替代。"
+    confidence: medium
+```
+
+## 4. 商店与升级规则
+
+```yaml
+rules:
+  - id: shop_priority
+    condition: "screen is shop"
+    actions:
+      priority_order: ["关键遗物", "核心牌", "删除诅咒/弱防御", "关键药水"]
+      notes: "A5 中后期防御不足时，防御牌和保命药水优先于锦上添花输出。"
+    confidence: high
+  - id: upgrade_by_bottleneck
+    condition: "screen is rest_site AND choose_rest_option is forge/upgrade candidate"
+    actions:
+      - "缺启动：升级抽牌、能量、核心能力。"
+      - "缺防守：升级高质量防牌或 Rage。"
+      - "缺斩杀：升级核心输出或易伤牌。"
+      - "Boss 前有缩放仪或血量安全时优先升级，否则休息。"
+    confidence: high
+```
+
+## 5. 外部攻略引用规则
+
+```yaml
+rules:
+  - id: monster_lookup_before_combat_decision
+    condition: "encounter is new monster, elite, boss, or known dangerous pattern"
+    actions:
+      - "用 docs/monster-encounter-knowledge-base.md 按 act+tier+name/mcp entity id 检索机制、危险点、打法、推荐准备。"
+      - "如果 mcp 英文名映射缺失，先按中文名/历史记录 fuzzy match，并在 rules_proposed 中记录映射修正建议。"
+    confidence: high
+  - id: card_lookup_before_reward_shop_upgrade
+    condition: "screen is card reward, shop, upgrade, delete, or deck construction decision"
+    actions:
+      - "优先用 docs/ironclad-card-knowledge-base.md 的 Playbook 关键牌执行索引处理 Battle Trance、True Grit、Impervious、Shockwave、Brand、Blood Wall、Offering 等高影响牌。"
+      - "再查询普通 tier、语境、联动、注意事项。"
+      - "tier 只是起点，最终结合当前牌组、遗物、血量、路线和短板判断。"
+    confidence: high
+```

@@ -1,0 +1,10 @@
+.DS_Store
+Thumbs.db
+*.tmp
+*.bak
+*.log
+run-logs/
+private/
+archive/
+*.local.*
+*.secret.*

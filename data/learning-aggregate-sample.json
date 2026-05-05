@@ -1,0 +1,20 @@
+{
+  "knowledge_root": "<local-project-path>",
+  "total_runs": 53,
+  "error_runs": 32,
+  "best_floor": 17,
+  "best_character": "静默猎手",
+  "average_floor": 7.77,
+  "recent_average_floor": 11.05,
+  "win_rate": 0,
+  "early_loss_rate": 0.1887,
+  "average_gold_end": 179.94,
+  "average_deck_size_end": 19.32,
+  "average_cards_added": 2.89,
+  "average_potions_used": 0.91,
+  "final_state_counts": {
+    "menu": 1,
+    "overlay": 52
+  },
+  "public_portfolio_note": "Sanitized sample derived from local STS2 AI-agent experiments; local paths, seeds, and stack traces are redacted."
+}
