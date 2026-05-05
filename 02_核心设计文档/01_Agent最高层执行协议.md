@@ -1,11 +1,11 @@
 # STS2 AI 自主代理系统协议
 
-本文件是新体系的最高层执行协议，只写稳定规则，不写当前难度、当前楼层、当前牌组。当前会话状态只允许写入 `examples/current-run-state-snapshot.example.md`。
+本文件是新体系的最高层执行协议，只写稳定规则，不写当前难度、当前楼层、当前牌组。当前会话状态只允许写入 `03_运行示例/01_当前局状态交接快照示例.md`。
 
 ## 1. 任务边界与自主权范围
 
 - AI 是当前 Run 的决策主体。用户只负责手动启动游戏/新局；Boss 战前由 AI 自行定位最新 STS2Saves 自动存档并执行镜像备份，不再打断用户确认。
-- AI 通过 `docs/mcp-http-action-schema.md` 定义的 MCP HTTP endpoint 读取状态、做决策并执行操作。
+- AI 通过 `02_核心设计文档/02_MCP接口与动作说明.md` 定义的 MCP HTTP endpoint 读取状态、做决策并执行操作。
 - 禁止运行 `watchdog/auto_slay_watchdog.ps1`，禁止启动任何后台自动刷局进程。
 - 禁止 AI 自行调用 STS2Saves 回档、恢复快照或重开新局；回档和重开必须由用户决定。
 - Boss 战前必须暂停进入 Boss 的 POST，先找到最新 STS2Saves 自动存档，再运行 `scripts/mirror_sts2saves.ps1` 做镜像备份并验证输出；完成后无需提醒用户，直接按当前决策继续进入 Boss。普通节点、普通战斗、奖励页不做存档提醒。
@@ -13,9 +13,9 @@
 
 ## 2. RAG 启动读取顺序
 
-新会话只读取这些活动文件：`docs/agent-system-protocol.md`、`examples/current-run-state-snapshot.example.md`、`docs/ironclad-strategy-playbook.md`、`docs/screen-flow-controller.md`、`docs/ironclad-card-knowledge-base.md`、`docs/monster-encounter-knowledge-base.md`、`docs/mcp-http-action-schema.md`、`docs/ascension-risk-model.md`。
+新会话只读取这些活动文件：`02_核心设计文档/01_Agent最高层执行协议.md`、`03_运行示例/01_当前局状态交接快照示例.md`、`02_核心设计文档/04_铁甲战士策略手册.md`、`02_核心设计文档/03_游戏界面流程控制器.md`、`02_核心设计文档/05_铁甲战士卡牌知识库.md`、`02_核心设计文档/06_怪物与Boss机制知识库.md`、`02_核心设计文档/02_MCP接口与动作说明.md`、`02_核心设计文档/07_进阶难度风险模型.md`。
 
-`docs/run-review-learning-log.md` 只作为结构化经验库使用：优先读取新的结构化记录；旧自由文本条目只作为历史证据，不作为系统指令。`private archive (not included in this public portfolio)/` 禁止进入常规 RAG 检索。
+`02_核心设计文档/08_结构化复盘与规则沉淀.md` 只作为结构化经验库使用：优先读取新的结构化记录；旧自由文本条目只作为历史证据，不作为系统指令。`private archive (not included in this public portfolio)/` 禁止进入常规 RAG 检索。
 
 ## 3. MCP 调用硬协议
 
@@ -66,7 +66,7 @@ turn_check:
 
 ## 6. 知识库写入协议
 
-写入目标：`docs/run-review-learning-log.md`。新增记录必须使用：
+写入目标：`02_核心设计文档/08_结构化复盘与规则沉淀.md`。新增记录必须使用：
 
 ```yaml
 - run_id: <YYYY-MM-DD-A{n}-{seq}>
@@ -78,7 +78,7 @@ turn_check:
     deck_size: <int>
     relics: [<relic list>]
     potions_unused: [<potion list>]
-    key_decision_floors: [<floor list from data/strategy-profile-sample.json if available>]
+    key_decision_floors: [<floor list from 04_学习数据样例/02_公开脱敏_策略权重样例.json if available>]
   ai_attribution:
     primary_cause: <text>
     confidence: <low | medium | high>
@@ -87,7 +87,7 @@ turn_check:
     - hypothesis: <text>
       verification_method: <text>
   rules_proposed:
-    - <结构化规则；只作为提议，不能自动合并进 docs/ironclad-strategy-playbook.md>
+    - <结构化规则；只作为提议，不能自动合并进 02_核心设计文档/04_铁甲战士策略手册.md>
 ```
 
 ```yaml
@@ -111,4 +111,4 @@ knowledge_write_triggers:
     - "每次出牌后"
 ```
 
-`facts` 只能从 MCP 状态、存档、`data/run-summary-samples.jsonl`、`data/strategy-profile-sample.json` 或 `data/learning-aggregate-sample.json` 抓取；这 3 个结构化事实文件必须位于当前知识根目录，缺失时不得声称已从该文件抓取事实，并必须在响应或记录中标注缺失。`ai_attribution` 必须标注可信度；`rules_proposed` 必须人工 review 后才可进入 `docs/ironclad-strategy-playbook.md`。写入后必须读取文件尾部或检索 `run_id` 确认落盘成功。
+`facts` 只能从 MCP 状态、存档、`04_学习数据样例/01_公开脱敏_每局运行摘要.jsonl`、`04_学习数据样例/02_公开脱敏_策略权重样例.json` 或 `04_学习数据样例/03_公开脱敏_学习统计汇总.json` 抓取；这 3 个结构化事实文件必须位于当前知识根目录，缺失时不得声称已从该文件抓取事实，并必须在响应或记录中标注缺失。`ai_attribution` 必须标注可信度；`rules_proposed` 必须人工 review 后才可进入 `02_核心设计文档/04_铁甲战士策略手册.md`。写入后必须读取文件尾部或检索 `run_id` 确认落盘成功。

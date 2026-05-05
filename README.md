@@ -1,4 +1,4 @@
-# Slay the Spire 2 AI Agent Portfolio
+# 《杀戮尖塔2》AI 代打 Agent 作品集
 
 这是一个面向作品集展示的 AI 游戏代理项目整理版。项目目标是让大语言模型通过 MCP HTTP 接口读取《Slay the Spire 2》局内状态，完成战斗出牌、路线选择、奖励评估、商店购买、篝火升级和复盘学习等决策。
 
@@ -17,34 +17,34 @@
 ```text
 .
 ├── README.md
-├── PROJECT_STRUCTURE.md
-├── docs
-│   ├── agent-system-protocol.md
-│   ├── mcp-http-action-schema.md
-│   ├── screen-flow-controller.md
-│   ├── ironclad-strategy-playbook.md
-│   ├── ironclad-card-knowledge-base.md
-│   ├── monster-encounter-knowledge-base.md
-│   ├── ascension-risk-model.md
-│   └── run-review-learning-log.md
-├── examples
-│   ├── current-run-state-snapshot.example.md
-│   └── decision-loop-example.md
-└── data
-    ├── run-summary-samples.jsonl
-    ├── strategy-profile-sample.json
-    └── learning-aggregate-sample.json
+├── 01_文件目录说明.md
+├── 02_核心设计文档
+│   ├── 01_Agent最高层执行协议.md
+│   ├── 02_MCP接口与动作说明.md
+│   ├── 03_游戏界面流程控制器.md
+│   ├── 04_铁甲战士策略手册.md
+│   ├── 05_铁甲战士卡牌知识库.md
+│   ├── 06_怪物与Boss机制知识库.md
+│   ├── 07_进阶难度风险模型.md
+│   └── 08_结构化复盘与规则沉淀.md
+├── 03_运行示例
+│   ├── 01_当前局状态交接快照示例.md
+│   └── 02_单回合决策循环示例.md
+└── 04_学习数据样例
+    ├── 01_公开脱敏_每局运行摘要.jsonl
+    ├── 02_公开脱敏_策略权重样例.json
+    └── 03_公开脱敏_学习统计汇总.json
 ```
 
 ## 推荐阅读顺序
 
-1. `docs/agent-system-protocol.md`：最高层执行协议，说明 Agent 的边界、行动纪律和复盘写入规则。
-2. `docs/mcp-http-action-schema.md`：GET/POST 接口、动作参数、索引字段和常见错误语义。
-3. `docs/screen-flow-controller.md`：不同界面下的动作流程，比如战斗、地图、奖励、事件、商店和篝火。
-4. `docs/ironclad-strategy-playbook.md`：铁甲战士构筑、路线、战斗、商店和升级策略。
-5. `examples/decision-loop-example.md`：一个简化的回合决策样例。
-6. `docs/run-review-learning-log.md`：结构化复盘如何进入策略知识库。
-7. `data/run-summary-samples.jsonl`：公开脱敏后的运行摘要样例。
+1. `02_核心设计文档/01_Agent最高层执行协议.md`：最高层执行协议，说明 Agent 的边界、行动纪律和复盘写入规则。
+2. `02_核心设计文档/02_MCP接口与动作说明.md`：GET/POST 接口、动作参数、索引字段和常见错误语义。
+3. `02_核心设计文档/03_游戏界面流程控制器.md`：不同界面下的动作流程，比如战斗、地图、奖励、事件、商店和篝火。
+4. `02_核心设计文档/04_铁甲战士策略手册.md`：铁甲战士构筑、路线、战斗、商店和升级策略。
+5. `03_运行示例/02_单回合决策循环示例.md`：一个简化的回合决策样例。
+6. `02_核心设计文档/08_结构化复盘与规则沉淀.md`：结构化复盘如何进入策略知识库。
+7. `04_学习数据样例/01_公开脱敏_每局运行摘要.jsonl`：公开脱敏后的运行摘要样例。
 
 ## 技术关键词
 
